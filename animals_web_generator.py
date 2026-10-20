@@ -1,88 +1,100 @@
 import json
+import data_fetcher
+import os
 
 HTML_FILE = "animals.html"
 JSON_FILE = "animals_data.json"
 
+API_KEY = "cB7R0CSqMvAXDwL8q4BaVQYpjVEZvSQm100ker4x"
+API_URL = "https://api.api-ninjas.com/v1/animals"
+
+
+
 def load_data(file_path):
-    """ Loads a JSON file """
-    with open(file_path, "r") as handle:
+    """Loads a JSON file securely with UTF-8 encoding."""
+    with open(file_path, "r", encoding="utf-8") as handle:
         return json.load(handle)
 
 
 def get_skin_types(data):
-    skin_types = set()
-    for animal in data:
-        skin = animal['characteristics'].get('skin_type')
-        if skin:
-            skin_types.add(skin.lower())
-
-    return skin_types
+    """Returns a set of all available, lowercased skin types."""
+    # Using a set comprehension is faster and more Pythonic
+    return {
+        animal.get('characteristics', {}).get('skin_type').lower()
+        for animal in data
+        if animal.get('characteristics', {}).get('skin_type')
+    }
 
 
 def serialize_animal(data):
-    '''Generate serialized HTML tags per animal
-    '''
-    output_str = ''
-    output_str += '<li class="cards__item">\n'
-    output_str += f'\t<div class="card__title"> {data['name']}</div>\n'
-    output_str += '\t<div class="card__text">\n'
-    output_str += '\t\t<ul>\n'
-    output_str += f"\t\t\t<li><strong>Diet:</strong> {data['characteristics']['diet']}</li>\n"
-    output_str += f"\t\t\t<li><strong>Location: </strong>"
-    for i in range(len(data['locations'])):
-        output_str += f"{data['locations'][i]}"
-        if len(data['locations']) > 1:
-            output_str += ", "
-    output_str += "</li>\n"
-    animal_type = data['characteristics'].get('type')
-    skin_type = data['characteristics'].get('skin_type')
+    """Generate serialized HTML tags per animal."""
+    # Use .get() chained safely to avoid KeyError on missing fields
+    name = data.get('name', 'Unknown Animal')
+    chars = data.get('characteristics', {})
+    diet = chars.get('diet', 'Unknown')
+    
+    # ".join()" handles formatting perfectly without trailing commas
+    locations_str = ", ".join(data.get('locations', []))
+    
+    # Build list items dynamically
+    li_tags = [
+        f"<li><strong>Diet:</strong> {diet}</li>",
+        f"<li><strong>Location:</strong> {locations_str}</li>"
+    ]
+    
+    animal_type = chars.get('type')
     if animal_type:
-        output_str += f"\t\t\t<li><strong>Type: </strong>{animal_type}</li>\n"
+        li_tags.append(f"<li><strong>Type:</strong> {animal_type}</li>")
+        
+    skin_type = chars.get('skin_type')
     if skin_type:
-        output_str += f"\t\t\t<li><strong>Skin type: </strong>{skin_type}</li>\n"
-    output_str += "\t\t</ul>\n\t</div>\n</li>\n"
-    return output_str
+        li_tags.append(f"<li><strong>Skin type:</strong> {skin_type}</li>")
+        
+    # Join the tags together for the final f-string injection
+    li_html = "\n\t\t\t".join(li_tags)
+    
+    # Multi-line f-strings are much faster than += concatenation
+    return f"""<li class="cards__item">
+\t<div class="card__title"> {name}</div>
+\t<div class="card__text">
+\t\t<ul>
+\t\t\t{li_html}
+\t\t</ul>
+\t</div>
+</li>\n"""
 
 
 def main():
-    '''Main fucntion'''
-    animals_data = load_data(JSON_FILE)
+    """Main function."""
 
     with open("animals_template.html", "r", encoding="utf-8") as file:
         html_content = file.read()
 
-    output_str = ''
-    while True:
-        user_choice = input("Filter by skin type [yes/no]:").strip()
-        if user_choice.lower() == "yes" or user_choice.lower() == "y":
-            skin_types = get_skin_types(animals_data)
-            print("Available skin types: ")
-            for skin in skin_types:
-                print(f"\t{skin.title()}", end=" ")
-
-            while True:
-                user_choice = input("\nEnter skin type from selection above:").strip()
-                if user_choice.lower() in skin_types:
-                    display_skin_type = user_choice.lower()
-                    for animal in animals_data:
-                        if animal['characteristics'].get('skin_type').lower() == display_skin_type:
-                            output_str += serialize_animal(animal)
-                    break   #break skin input while loop
-                else:
-                    print("Skin type not available :(")
-            break   #break main while loop
-
-        elif user_choice.lower() == "no" or user_choice.lower() == "n":
-            print("no")
-            for animal in animals_data:
-                output_str += serialize_animal(animal)
-            break
-
-    new_page = html_content.replace("__REPLACE_ANIMALS_INFO__", output_str)
+    # Collect HTML chunks in a list (much faster than concatenating strings in a loop)
+    output_list = []
     
+  
+    user_choice = input("Enter a name of an animal: ").strip().lower()
+    # response = requests.get(
+    #     f"https://api.api-ninjas.com/v1/animals?name={user_choice}",
+    #     headers={'X-Api-Key': 'cB7R0CSqMvAXDwL8q4BaVQYpjVEZvSQm100ker4x'},
+    #     timeout=30,
+    #     )
+    # response.raise_for_status()
+    animals_data = data_fetcher.fetch_data(user_choice)
+    if not animals_data:
+        print(f"No data found for '{user_choice}'. Please try again.")
+        output_list.append(f"<li class='cards__item'>The animal '{user_choice}' doesn't exist.</li>\n")
+    else:
+        print(f"Data found for '{user_choice}', processing...")
+        output_list = [serialize_animal(animal) for animal in animals_data]
 
+    # Join the accumulated HTML blocks all at once
+    new_page = html_content.replace("__REPLACE_ANIMALS_INFO__", "".join(output_list))
+    
     with open(HTML_FILE, "w", encoding="utf-8") as file:
-        html_content = file.write(new_page)
+        file.write(new_page) # .write() returns character count, no need to assign it to a variable
+        
     print(f"HTML file {HTML_FILE} updated.")
 
 
