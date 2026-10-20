@@ -5,8 +5,6 @@ import os
 HTML_FILE = "animals.html"
 JSON_FILE = "animals_data.json"
 
-API_KEY = "cB7R0CSqMvAXDwL8q4BaVQYpjVEZvSQm100ker4x"
-API_URL = "https://api.api-ninjas.com/v1/animals"
 
 
 
@@ -75,13 +73,8 @@ def main():
     
   
     user_choice = input("Enter a name of an animal: ").strip().lower()
-    # response = requests.get(
-    #     f"https://api.api-ninjas.com/v1/animals?name={user_choice}",
-    #     headers={'X-Api-Key': 'cB7R0CSqMvAXDwL8q4BaVQYpjVEZvSQm100ker4x'},
-    #     timeout=30,
-    #     )
-    # response.raise_for_status()
     animals_data = data_fetcher.fetch_data(user_choice)
+    
     if not animals_data:
         print(f"No data found for '{user_choice}'. Please try again.")
         output_list.append(f"<li class='cards__item'>The animal '{user_choice}' doesn't exist.</li>\n")
